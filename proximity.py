@@ -1,7 +1,7 @@
 import numpy as np
 import math
 from collections import defaultdict
-from dec import DecisionTree, bootstrap_indices
+from decision_tree import DecisionTree, bootstrap_indices
 from ucimlrepo import fetch_ucirepo
 from sklearn.model_selection import train_test_split
 
