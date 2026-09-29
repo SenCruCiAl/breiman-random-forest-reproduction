@@ -1,0 +1,9 @@
+Breiman (2001) Section 4 protocol: 100 repetitions, 10% test, 100 trees, F in {1, 4}, selection by lower OOB error
+setting                ours mean %    sd %    SE %  paper %
+Selection                     2.58    1.86    0.19      2.9
+Single input (F=1)            2.57    1.79    0.18      2.7
+F=4                           2.88    1.95    0.19        -
+F=3 (sqrt p)                  2.70    2.03    0.20        -
+One tree                      6.08    0.42    0.04      6.3
+Adaboost                         -       -       -      3.2
+'One tree' = mean OOB error of individual trees in the selected forest (paper's 4th column).
