@@ -4,8 +4,9 @@ from multiprocessing import Pool
 import numpy as np
 from scipy.stats import wilcoxon
 from sklearn.model_selection import train_test_split
-from decision_tree import DecisionTree, bootstrap_indices
-from random_forest import load_wbc, train_forest, forest_predict, oob_error
+from decision_tree import bootstrap_indices
+from random_forest import load_wbc, forest_predict, oob_error
+from split_criteria import CriterionTree, train_forest
 from paper_comparison import N_REPEATS, TEST_SIZE, N_TREES, mean_tree_oob_error
 
 # Gini vs. entropy (information gain) under Breiman (2001) Section 4 protocol.
@@ -33,7 +34,7 @@ def one_repeat(r, X, y):
     return out
 
 
-class SplitAuditTree(DecisionTree):
+class SplitAuditTree(CriterionTree):
     """Gini tree that, at every internal node, also records whether entropy would pick the same split
     from the same candidate features."""
 
