@@ -135,15 +135,40 @@ with entropy as the split criterion, paired (same split and seed per
 repetition). Results are in
 [`results/criterion_comparison.txt`](results/criterion_comparison.txt).
 
-| Setting | Gini, % | Entropy, % | Entropy − Gini, points (95% CI) |
-|---|---|---|---|
-| Selection | 2.58 | 2.54 | −0.04 (−0.23, +0.15) |
-| Single input (F = 1) | 2.57 | 2.51 | −0.06 (−0.23, +0.11) |
-| One tree | 6.08 | 6.02 | −0.06 (−0.14, +0.03) |
+| Setting | Gini, % | Entropy, % | Entropy − Gini, points (95% CI) | Wilcoxon p | Gini better / tie / entropy better |
+|---|---|---|---|---|---|
+| Selection | 2.58 | 2.54 | −0.04 (−0.23, +0.15) | 0.61 | 13 / 70 / 17 |
+| Single input (F = 1) | 2.57 | 2.51 | −0.06 (−0.23, +0.11) | 0.54 | 9 / 76 / 15 |
+| F = 4 | 2.88 | 2.80 | −0.09 (−0.32, +0.15) | 0.81 | 24 / 47 / 29 |
+| One tree | 6.08 | 6.02 | −0.06 (−0.14, +0.03) | 0.36 | 45 / 0 / 55 |
 
-No difference in error is detectable (all Wilcoxon p > 0.3). The trees still
-differ: the two criteria pick a different split at 9–20% of nodes, depending
-on F, mostly at large nodes near the root. See [`REPORT.md`](REPORT.md), §5.4.
+Split agreement: at every internal node of 100 Gini trees grown on bootstrap
+samples of all 683 rows, the split entropy would pick from the same candidate
+features was compared with the Gini split.
+
+| F | Nodes | Disagree, all | n 2–9 | n 10–49 | n ≥ 50 | Median node size, agree / disagree |
+|---|---|---|---|---|---|---|
+| 1 | 3183 | 8.8% | 0.4% | 5.5% | 18.8% | 21 / 170 |
+| 4 | 2608 | 15.3% | 0.8% | 9.3% | 35.1% | 16 / 239 |
+| 9 | 2139 | 20.3% | 0.9% | 12.2% | 42.3% | 17 / 266 |
+
+Findings:
+
+- **No detectable difference in error.** Every 95% confidence interval
+  contains 0 and every Wilcoxon p is above 0.3. Entropy is nominally lower by
+  0.04–0.09 points, which is well inside the noise. In 47–76 of 100
+  repetitions the two forests make exactly the same test error.
+- **The trees do differ.** The criteria disagree at 9–20% of nodes, more as F
+  grows. That is well above the ≈2% disagreement reported by Raileanu and
+  Stoffel (2004), the most-cited comparison of the two criteria, so their
+  figure shouldn't be treated as a general rule.
+- **Disagreements are near the root.** They are rare at small nodes (< 1%)
+  but common at nodes with 50 or more rows (19–42%). The upper trees differ,
+  and the fully grown forests still reach the same error.
+- **Gini stays the default.** This matches the Raileanu and Stoffel
+  (2004) conclusion that the choice of criterion rarely matters for accuracy.
+
+Full discussion: [`REPORT.md`](REPORT.md), §5.4.
 
 ## Figures
 
@@ -267,6 +292,7 @@ python criterion_comparison.py  # Gini vs. entropy, paired (~2 min on 4 cores)
 - Raileanu, L. E., & Stoffel, K. (2004). Theoretical comparison between the
   Gini Index and Information Gain criteria. *Annals of Mathematics and
   Artificial Intelligence*, 41(1), 77–93.
+  https://doi.org/10.1023/B:AMAI.0000018580.96245.c6
 - Wolberg, W. (1990). Breast Cancer Wisconsin (Original) [Dataset]. UCI
   Machine Learning Repository. https://doi.org/10.24432/C5HP4Z
 
