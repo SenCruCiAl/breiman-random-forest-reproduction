@@ -11,6 +11,11 @@ This is a reproduction study and educational project, not a peer-reviewed
 publication or a novel research contribution. The full write-up is in
 [`REPORT.md`](REPORT.md).
 
+**Part 2, a follow-up study:** [`README2.md`](README2.md) tests whether the
+split criterion matters by comparing Gini impurity with entropy under the
+same paper protocol. The two give no detectable difference in error, though
+they build visibly different trees.
+
 ## Overview
 
 Implemented from first principles (NumPy only, no `sklearn.ensemble`):
@@ -41,6 +46,9 @@ Trees are CART-style: Gini impurity, fully grown (`max_depth=None`,
 ├── results/             # Recorded outputs of the scripts above
 ├── figures/             # Proximity heatmap, outlier score histograms, MDS embedding
 ├── REPORT.md
+├── README2.md               # Part 2: Gini vs. entropy follow-up study
+├── split_criteria.py        # Part 2: tree/forest with selectable split criterion
+├── criterion_comparison.py  # Part 2: paired Gini vs. entropy comparison
 ├── requirements.txt
 └── LICENSE              # MIT
 ```
