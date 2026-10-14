@@ -6,6 +6,7 @@ mechanisms of Breiman, L. (2001), *Random Forests*, Machine Learning, 45(1),
 evaluation protocol. The project is extended with a proximity-based outlier
 measure. That measure comes from Breiman and Cutler's later Random Forests
 documentation (Breiman, 2002); the 2001 paper doesn't discuss proximities.
+A paired ablation also compares the Gini and entropy split criteria.
 
 This is a reproduction study and educational project, not a peer-reviewed
 publication or a novel research contribution. The full write-up is in
@@ -27,22 +28,29 @@ Extension:
 4. **Proximity-based outlier detection**: a forest-derived similarity matrix
    used to flag atypical samples within each class
 
-Trees are CART-style: Gini impurity, fully grown (`max_depth=None`,
-`min_samples_split=2`), unpruned.
+Ablation:
+
+5. **Gini vs. entropy split criterion**: the same paper protocol run with
+   both criteria on identical splits and seeds
+
+Trees are CART-style: Gini impurity by default (entropy via
+`criterion="entropy"`), fully grown (`max_depth=None`, `min_samples_split=2`),
+unpruned.
 
 ## Repository structure
 
 ```
-├── decision_tree.py     # Node, DecisionTree (Gini, fully grown), bootstrap_indices
-├── random_forest.py     # Data loading, forest training, OOB error, test accuracy
-├── proximity.py         # Proximity matrix + outlier scores (extension)
-├── generate_plots.py    # Figures in figures/
-├── paper_comparison.py  # Breiman (2001) §4 protocol vs. Table 2, plus comparison figure
-├── results/             # Recorded outputs of the scripts above
-├── figures/             # Proximity heatmap, outlier score histograms, MDS embedding
+├── decision_tree.py         # Node, DecisionTree (Gini or entropy, fully grown), bootstrap_indices
+├── random_forest.py         # Data loading, forest training, OOB error, test accuracy
+├── proximity.py             # Proximity matrix + outlier scores (extension)
+├── generate_plots.py        # Figures in figures/
+├── paper_comparison.py      # Breiman (2001) §4 protocol vs. Table 2, plus comparison figure
+├── criterion_comparison.py  # Gini vs. entropy under the same protocol (paired)
+├── results/                 # Recorded outputs of the scripts above
+├── figures/                 # Proximity heatmap, outlier score histograms, MDS embedding
 ├── REPORT.md
 ├── requirements.txt
-└── LICENSE              # MIT
+└── LICENSE                  # MIT
 ```
 
 ## Dataset
@@ -119,6 +127,23 @@ trees):
   `{1: 31, 2: 24, 4: 9, 5: 13, 6: 19, 7: 4}`.
 - With `m = p = 9` (the control, no subsetting), the root split uses 3
   features, and one of them dominates: `{1: 81, 2: 18, 6: 1}`.
+
+### Gini vs. entropy
+
+[`criterion_comparison.py`](criterion_comparison.py) reruns the same protocol
+with entropy as the split criterion, paired (same split and seed per
+repetition). Results are in
+[`results/criterion_comparison.txt`](results/criterion_comparison.txt).
+
+| Setting | Gini, % | Entropy, % | Entropy − Gini, points (95% CI) |
+|---|---|---|---|
+| Selection | 2.58 | 2.54 | −0.04 (−0.23, +0.15) |
+| Single input (F = 1) | 2.57 | 2.51 | −0.06 (−0.23, +0.11) |
+| One tree | 6.08 | 6.02 | −0.06 (−0.14, +0.03) |
+
+No difference in error is detectable (all Wilcoxon p > 0.3). The trees still
+differ: the two criteria pick a different split at 9–20% of nodes, depending
+on F, mostly at large nodes near the root. See [`REPORT.md`](REPORT.md), §5.4.
 
 ## Figures
 
@@ -226,10 +251,11 @@ the global top 5% of normalized outlier score.
 ```bash
 pip install -r requirements.txt
 
-python random_forest.py     # data, bootstrap check, OOB error, test accuracy (~3 s)
-python proximity.py         # proximity matrix checks and outlier scores (~3 s)
-python generate_plots.py    # writes figures/*.png
-python paper_comparison.py  # Breiman (2001) protocol vs. Table 2 (~7 min)
+python random_forest.py         # data, bootstrap check, OOB error, test accuracy (~3 s)
+python proximity.py             # proximity matrix checks and outlier scores (~3 s)
+python generate_plots.py        # writes figures/*.png
+python paper_comparison.py      # Breiman (2001) protocol vs. Table 2 (~7 min)
+python criterion_comparison.py  # Gini vs. entropy, paired (~2 min on 4 cores)
 ```
 
 ## References
@@ -238,6 +264,9 @@ python paper_comparison.py  # Breiman (2001) protocol vs. Table 2 (~7 min)
 - Breiman, L. (1996). Bagging Predictors. *Machine Learning*, 24(2), 123–140.
 - Breiman, L. (2002). *Manual on Setting Up, Using, and Understanding Random
   Forests V3.1*. Statistics Department, University of California, Berkeley.
+- Raileanu, L. E., & Stoffel, K. (2004). Theoretical comparison between the
+  Gini Index and Information Gain criteria. *Annals of Mathematics and
+  Artificial Intelligence*, 41(1), 77–93.
 - Wolberg, W. (1990). Breast Cancer Wisconsin (Original) [Dataset]. UCI
   Machine Learning Repository. https://doi.org/10.24432/C5HP4Z
 

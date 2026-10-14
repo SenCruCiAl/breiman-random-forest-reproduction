@@ -42,14 +42,14 @@ def load_split(verbose=False):
     return train_test_split(X, y, test_size=0.2, random_state=SEED)
 
 
-def train_forest(X_train, y_train, n_trees=N_TREES, seed=SEED, n_features=None):
-    """Train n_trees fully grown Gini trees on bootstrap samples; return list of (tree, oob_idx)."""
+def train_forest(X_train, y_train, n_trees=N_TREES, seed=SEED, n_features=None, criterion="gini"):
+    """Train n_trees fully grown trees (Gini by default) on bootstrap samples; return list of (tree, oob_idx)."""
     rng = np.random.default_rng(seed)
     m = n_features if n_features is not None else max(1, int(math.sqrt(X_train.shape[1])))
     trees = []
     for _ in range(n_trees):
         sample_idx, oob_idx = bootstrap_indices(len(y_train), rng)
-        tree = DecisionTree(max_depth=None, min_samples_split=2, n_features=m, rng=rng)
+        tree = DecisionTree(max_depth=None, min_samples_split=2, n_features=m, rng=rng, criterion=criterion)
         tree.fit(X_train[sample_idx], y_train[sample_idx])
         trees.append((tree, oob_idx))
     return trees

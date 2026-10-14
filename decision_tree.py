@@ -32,9 +32,16 @@ class Node:
 
 
 class DecisionTree:
-    """CART-style classification tree: Gini impurity, fully grown by default (max_depth=None)."""
+    """CART-style classification tree, fully grown by default (max_depth=None).
 
-    def __init__(self, min_samples_split=2, max_depth=None, n_features=None, rng=None):
+    criterion: "gini" (default, 1 - sum p_k^2) or "entropy" (-sum p_k log2 p_k, i.e. information gain).
+    """
+
+    def __init__(self, min_samples_split=2, max_depth=None, n_features=None, rng=None, criterion="gini"):
+        if criterion not in ("gini", "entropy"):
+            raise ValueError(f"criterion must be 'gini' or 'entropy', got {criterion!r}")
+        self.criterion = criterion
+        self._impurity = self._gini if criterion == "gini" else self._entropy
         self.min_samples_split = min_samples_split
         self.max_depth = max_depth
         self.n_features = n_features
@@ -75,23 +82,23 @@ class DecisionTree:
             X_column = X[:, feat_idx]
             thresholds = np.unique(X_column)[:-1]
             for threshold in thresholds:
-                gain = self._gini_gain(y, X_column, threshold)
+                gain = self._impurity_gain(y, X_column, threshold)
                 if gain > best_gain:
                     best_gain = gain
                     split_idx = feat_idx
                     split_threshold = threshold
         return split_idx, split_threshold
 
-    def _gini_gain(self, y, X_column, threshold):
-        parent_gini = self._gini(y)
+    def _impurity_gain(self, y, X_column, threshold):
+        parent_impurity = self._impurity(y)
         left_idxs, right_idxs = self._split(X_column, threshold)
         if len(left_idxs) == 0 or len(right_idxs) == 0:
             return 0
         n = len(y)
         n_l, n_r = len(left_idxs), len(right_idxs)
-        g_l, g_r = self._gini(y[left_idxs]), self._gini(y[right_idxs])
-        child_gini = (n_l / n) * g_l + (n_r / n) * g_r
-        return parent_gini - child_gini
+        i_l, i_r = self._impurity(y[left_idxs]), self._impurity(y[right_idxs])
+        child_impurity = (n_l / n) * i_l + (n_r / n) * i_r
+        return parent_impurity - child_impurity
 
     def _split(self, X_column, split_thresh):
         left_idxs = np.argwhere(X_column <= split_thresh).flatten()
@@ -101,6 +108,11 @@ class DecisionTree:
     def _gini(self, y):
         ps = np.bincount(y) / len(y)
         return 1.0 - np.sum(ps ** 2)
+
+    def _entropy(self, y):
+        ps = np.bincount(y) / len(y)
+        ps = ps[ps > 0]
+        return -np.sum(ps * np.log2(ps))
 
     def _most_common_label(self, y):
         counter = Counter(y)

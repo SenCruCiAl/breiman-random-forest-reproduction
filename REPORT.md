@@ -84,7 +84,7 @@ class.
 
 | Component | Source |
 |---|---|
-| `DecisionTree`, `Node`, Gini split search, prediction, leaf lookup | from scratch (`decision_tree.py`) |
+| `DecisionTree`, `Node`, Gini (default) or entropy split search, prediction, leaf lookup | from scratch (`decision_tree.py`) |
 | `bootstrap_indices`, forest training, majority vote, OOB error | from scratch (`decision_tree.py`, `random_forest.py`) |
 | Proximity matrix, raw and normalized outlier scores | from scratch (`proximity.py`) |
 | Classical (Torgerson) MDS for the embedding figure | from scratch, NumPy `eigh` (`generate_plots.py`) |
@@ -192,7 +192,43 @@ over 100 repetitions.
   random-forest error of 2.94% on the Wisconsin Breast Cancer data, from a
   separate experiment.
 
-### 5.4 Proximity matrix
+### 5.4 Split criterion: Gini vs. entropy
+
+`criterion_comparison.py` reruns the §5.3 protocol with entropy
+(information gain, `−Σ p_k log₂ p_k`) as the split criterion. The design is
+paired: each of the 100 repetitions uses the same train/test split and the
+same forest seed for both criteria. The Gini rows reproduce §5.3 exactly.
+Full output: [`results/criterion_comparison.txt`](results/criterion_comparison.txt).
+
+| Setting | Gini, % | Entropy, % | Entropy − Gini, points (95% CI) | Wilcoxon p |
+|---|---|---|---|---|
+| Selection | 2.58 | 2.54 | −0.04 (−0.23, +0.15) | 0.61 |
+| Single input (F = 1) | 2.57 | 2.51 | −0.06 (−0.23, +0.11) | 0.54 |
+| F = 4 | 2.88 | 2.80 | −0.09 (−0.32, +0.15) | 0.81 |
+| One tree | 6.08 | 6.02 | −0.06 (−0.14, +0.03) | 0.36 |
+
+- **No detectable difference in error.** Every confidence interval contains
+  0, and no Wilcoxon signed-rank test comes close to significance. In 47–76
+  of the 100 repetitions the two forests make exactly the same test error.
+- **The trees themselves do differ.** Growing 100 Gini trees on bootstrap
+  samples of all 683 rows and asking, at every internal node, which split
+  entropy would choose from the same candidate features: the two criteria
+  disagree at 8.8% of nodes for F = 1, 15.3% for F = 4 and 20.3% for F = 9.
+  That is well above the ≈2% disagreement reported by Raileanu and Stoffel
+  (2004) for their datasets, so the ≈2% figure should not be quoted as a
+  general rule.
+- **The disagreements are near the root, not deep in the tree.** Disagreement
+  is 0.4–0.9% at nodes with fewer than 10 rows but 19–42% at nodes with 50 or
+  more rows. The median node size is 16–21 where the criteria agree and
+  170–266 where they disagree. So entropy and Gini build visibly different
+  upper trees, and the forests still end up with the same error. A plausible
+  reason, not tested here, is that this dataset is close to separable, so
+  several different top splits lead to equally good partitions once the trees
+  are fully grown.
+- **Conclusion.** Gini, the CART and Breiman default, is kept. Choosing
+  entropy would not change any conclusion in this report.
+
+### 5.5 Proximity matrix
 
 | Check | Value |
 |---|---|
@@ -336,5 +372,8 @@ its flags mean anything.
   Forests V3.1*. Statistics Department, University of California, Berkeley.
   (Source of the proximity-based outlier measure; the 2001 paper doesn't
   cover proximities.)
+- Raileanu, L. E., & Stoffel, K. (2004). Theoretical comparison between the
+  Gini Index and Information Gain criteria. *Annals of Mathematics and
+  Artificial Intelligence*, 41(1), 77–93.
 - Wolberg, W. (1990). Breast Cancer Wisconsin (Original) [Dataset]. UCI
   Machine Learning Repository. https://doi.org/10.24432/C5HP4Z
