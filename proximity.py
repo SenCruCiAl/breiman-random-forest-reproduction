@@ -6,19 +6,34 @@ OUTLIER_THRESHOLD = 3.0
 OUTLIER_PERCENTILE = 95
 
 
-def compute_proximity_matrix(trees, X):
-    """Fraction of trees in which each pair of rows of X shares a leaf (leaf-grouped, not naive n^2 per tree)."""
+def compute_proximity_matrix(trees, X, oob_only=False):
+    """Fraction of trees in which each pair of rows of X shares a leaf (leaf-grouped, not naive n^2 per tree).
+
+    With oob_only=True, a tree only counts for a pair when both rows are out-of-bag for it, and the
+    count is divided by the number of such trees (Hastie, Tibshirani & Friedman, ESL 2nd ed., 15.3.3).
+    This removes the pull of fully grown trees towards their own in-bag rows. X must then be the
+    training matrix the forest was grown on, since oob indices refer to its rows.
+    """
     n = X.shape[0]
-    proximity = np.zeros((n, n))
-    for tree, _ in trees:
+    shared = np.zeros((n, n))
+    counted = np.zeros((n, n)) if oob_only else None
+    for tree, oob_idx in trees:
+        rows = oob_idx if oob_only else range(n)
+        if oob_only:
+            in_oob = np.zeros(n, dtype=bool)
+            in_oob[oob_idx] = True
+            counted += np.outer(in_oob, in_oob)
         leaf_groups = defaultdict(list)
-        for i in range(n):
+        for i in rows:
             leaf = tree.get_leaf(X[i])
             leaf_groups[leaf.leaf_id].append(i)
         for group in leaf_groups.values():
             idx = np.array(group)
-            proximity[np.ix_(idx, idx)] += 1
-    proximity /= len(trees)
+            shared[np.ix_(idx, idx)] += 1
+    if not oob_only:
+        return shared / len(trees)
+    proximity = np.divide(shared, counted, out=np.zeros_like(shared), where=counted > 0)
+    np.fill_diagonal(proximity, 1.0)
     return proximity
 
 
@@ -89,3 +104,25 @@ if __name__ == "__main__":
 
     train_wrong = forest_predict(trees, X_train) != y_train
     print(f"Train misclassified: {train_wrong.sum()} -> overlap with outlier flags is not a meaningful test")
+
+    # Ablation: does in-bag proximity cause the benign MAD collapse? Recompute with OOB pairs only.
+    print("\n## OOB-only proximity (ablation)")
+    prox_oob = compute_proximity_matrix(trees, X_train, oob_only=True)
+    print(f"Mean proximity, same class: {prox_oob[same].mean():.4f}; different class: {prox_oob[diff].mean():.4f}")
+    raw_oob = compute_raw_outlier_scores(prox_oob, y_train)
+    norm_oob = normalize_outlier_scores(raw_oob, y_train)
+    mads = {}
+    for c, name in [(0, "benign"), (1, "malignant")]:
+        idx = y_train == c
+        mads[name] = np.median(np.abs(raw_oob[idx] - np.median(raw_oob[idx])))
+    print(f"Raw MAD benign {mads['benign']:.4f}, malignant {mads['malignant']:.4f} "
+          f"(ratio {mads['malignant'] / mads['benign']:.1f})")
+    print(f"Normalized max {norm_oob.max():.2f}; flagged (> {OUTLIER_THRESHOLD}): "
+          f"{(norm_oob > OUTLIER_THRESHOLD).sum()}/{n} ({(norm_oob > OUTLIER_THRESHOLD).mean():.1%})")
+    co_oob = np.zeros((n, n))
+    for _, oob_idx in trees:
+        m = np.zeros(n, dtype=bool)
+        m[oob_idx] = True
+        co_oob += np.outer(m, m)
+    off_co = co_oob[~np.eye(n, dtype=bool)]
+    print(f"Trees in which a pair is jointly OOB: mean {off_co.mean():.1f}, min {off_co.min():.0f}")

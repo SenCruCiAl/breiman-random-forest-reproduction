@@ -309,6 +309,32 @@ Checking that interpretation would require the out-of-sample and
 misclassification analyses listed as limitations 4 and 5. It is a hypothesis,
 not a result.
 
+### 7.4 Ablation: is in-bag proximity the cause?
+
+A plausible root cause for the tight benign core in §7.2 is that the
+proximities count in-bag rows. Fully grown trees fit their in-bag rows
+exactly, so in-bag rows of the same class are pulled into shared leaves.
+Hastie, Tibshirani & Friedman (*ESL*, 2nd ed., §15.3.3) define the forest
+proximity using out-of-bag pairs only. `compute_proximity_matrix(...,
+oob_only=True)` implements that definition: a tree counts for a pair only when
+both rows are out-of-bag for it, and the count is divided by the number of
+such trees. Same forest, same seed:
+
+| Statistic | In-bag (§7.2) | OOB only |
+|---|---|---|
+| Mean proximity, same / different class | 0.681 / 0.008 | 0.672 / 0.021 |
+| Raw MAD, benign / malignant | 0.042 / 3.321 | 0.085 / 3.294 |
+| MAD ratio | 78.3× | 38.9× |
+| Normalized max | 8209 | 3484 |
+| Flagged at > 3 | 153/546 (28.0%) | 137/546 (25.1%) |
+
+In-bag counting accounts for about half of the MAD disparity, but the flag
+rate barely changes. The hypothesis is only partly supported: the
+normalization problem in §7.2 persists under the textbook OOB definition, so
+the per-class top-5% recommendation stands. OOB proximities are also noisier
+here: a pair is jointly out-of-bag in only 13.4 of 100 trees on average
+(minimum 1), so a larger forest would be needed before relying on them.
+
 ## 8. Conclusion
 
 The from-scratch implementation reproduces the core Random Forest mechanisms,
