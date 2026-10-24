@@ -1,5 +1,8 @@
 # Breiman Random Forest Reproduction
 
+[![CI](https://github.com/SenCruCiAl/breiman-random-forest-reproduction/actions/workflows/ci.yml/badge.svg)](https://github.com/SenCruCiAl/breiman-random-forest-reproduction/actions/workflows/ci.yml)
+**Project page:** https://sencrucial.github.io/breiman-random-forest-reproduction/ (interactive view of the 100-repetition results)
+
 From-scratch implementation of Random Forests reproducing the core algorithmic
 mechanisms of Breiman, L. (2001), *Random Forests*, Machine Learning, 45(1),
 5–32. It is validated against the paper's Table 2 using the paper's own
@@ -49,6 +52,8 @@ Trees are CART-style: Gini impurity, fully grown (`max_depth=None`,
 ├── README2.md               # Part 2: Gini vs. entropy follow-up study
 ├── split_criteria.py        # Part 2: tree/forest with selectable split criterion
 ├── criterion_comparison.py  # Part 2: paired Gini vs. entropy comparison
+├── tests/                   # Fast synthetic-data checks (pytest, run in CI)
+├── docs/index.html          # Project page (deployed by .github/workflows/pages.yml)
 ├── requirements.txt
 └── LICENSE              # MIT
 ```
@@ -92,6 +97,12 @@ All numbers come from a single clean run of the final configuration
 | Outliers flagged, normalized score > 3 | 153/546 (28.0%) |
 | Outliers flagged, global top 5% | 28/546 (**all 28 benign**) |
 | Outliers flagged, per-class top 5% | 19/365 benign, 9/181 malignant |
+
+**Ablation, OOB-only proximity** (`compute_proximity_matrix(..., oob_only=True)`,
+the definition in Hastie, Tibshirani & Friedman, *ESL* §15.3.3). Restricting
+proximities to jointly out-of-bag pairs halves the benign/malignant MAD gap
+(78.3× → 38.9×) but barely changes the flag rate at > 3 (28.0% → 25.1%). So
+in-bag counting is only part of the outlier-score problem; see REPORT §7.4.
 
 ### Comparison with Breiman (2001), Table 2
 

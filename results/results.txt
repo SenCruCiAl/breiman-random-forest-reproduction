@@ -30,3 +30,9 @@ Flagged (top 5%, normalized > 65.04): 28/546
   class malignant: raw median 6.473, MAD 3.3209; per-class top-5% flags: 9/181
 Most outlying train row 211: normalized 8209.25, prox > 0 to 14/364 same-class samples
 Train misclassified: 0 -> overlap with outlier flags is not a meaningful test
+
+## OOB-only proximity (ablation)
+Mean proximity, same class: 0.6721; different class: 0.0210
+Raw MAD benign 0.0846, malignant 3.2939 (ratio 38.9)
+Normalized max 3483.56; flagged (> 3.0): 137/546 (25.1%)
+Trees in which a pair is jointly OOB: mean 13.4, min 1

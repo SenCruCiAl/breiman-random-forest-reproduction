@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Random Forests, reproduced</title>
+<meta name="description" content="A from-scratch NumPy reproduction of Breiman (2001) Random Forests, checked against the paper's Table 2 with its own protocol.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f5f0; --ink: #1d1c1a; --muted: #6a6760; --rule: #d9d5cc;
+    --accent: #2f5d3a; --paper: #b5542b; --dot: rgba(47, 93, 58, .38); --panel: #efece4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161614; --ink: #e9e6df; --muted: #9c988f; --rule: #34322e;
+      --accent: #8fc29b; --paper: #e8875a; --dot: rgba(143, 194, 155, .4); --panel: #1f1e1b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161614; --ink: #e9e6df; --muted: #9c988f; --rule: #34322e;
+    --accent: #8fc29b; --paper: #e8875a; --dot: rgba(143, 194, 155, .4); --panel: #1f1e1b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 18px/1.6 "Source Serif 4", Georgia, serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 56px 16px 80px; }
+  header { border-bottom: 1px solid var(--rule); padding-bottom: 28px; margin-bottom: 36px; }
+  .kicker { font: 500 12px/1 "IBM Plex Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-size: 40px; line-height: 1.12; font-weight: 600; margin: 14px 0 12px; letter-spacing: -.01em; }
+  h2 { font-size: 22px; font-weight: 600; margin: 48px 0 8px; }
+  h2 .n { font: 500 13px "IBM Plex Mono", monospace; color: var(--muted); margin-right: 10px; }
+  p { margin: 0 0 14px; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  .lede { font-size: 20px; color: var(--ink); }
+  .links { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 16px; font: 14px "IBM Plex Mono", monospace; }
+  .mono, td.num, th.num { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; margin: 12px 0 8px; }
+  th, td { text-align: left; padding: 7px 10px 7px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-weight: 600; font-size: 13px; color: var(--muted); }
+  td.num, th.num { text-align: right; padding-right: 0; padding-left: 10px; font-size: 14px; }
+  figure { margin: 22px 0 26px; }
+  figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; }
+  figcaption b { color: var(--ink); font-weight: 600; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 0; border-bottom: 1px solid var(--rule); margin-top: 12px; }
+  .tabs button {
+    font: 13px "IBM Plex Mono", monospace; color: var(--muted); background: none; border: 0;
+    border-bottom: 2px solid transparent; padding: 8px 12px 7px; margin-bottom: -1px; cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  svg text { font-family: "IBM Plex Mono", monospace; fill: var(--muted); font-size: 11px; }
+  .readout { font: 14px "IBM Plex Mono", monospace; margin-top: 6px; color: var(--ink); }
+  .readout span { color: var(--muted); }
+  .note { background: var(--panel); padding: 14px 16px; font-size: 16px; border-left: 3px solid var(--accent); margin: 18px 0; }
+  img { max-width: 100%; height: auto; display: block; background: #fff; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) {
+    body { font-size: 17px; }
+    h1 { font-size: 31px; }
+    .pair { grid-template-columns: 1fr; }
+    th, td { padding-right: 6px; }
+  }
+  td.aside { color: var(--muted); padding-left: 16px; font-size: 14px; }
+  footer { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--rule); font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="kicker">Reproduction study · NumPy, no sklearn.ensemble</div>
+    <h1>Random Forests, reproduced from the 2001 paper</h1>
+    <p class="lede">Bagging, per-split feature subsetting and out-of-bag error, written from first principles and
+      checked against Table 2 of Breiman (2001) using the paper's own evaluation protocol on the Wisconsin breast
+      cancer data.</p>
+    <div class="links">
+      <a href="https://github.com/SenCruCiAl/breiman-random-forest-reproduction">Source on GitHub</a>
+      <a href="https://github.com/SenCruCiAl/breiman-random-forest-reproduction/blob/main/REPORT.md">Full report</a>
+      <a href="https://github.com/SenCruCiAl/breiman-random-forest-reproduction/blob/main/README2.md">Part 2: Gini vs. entropy</a>
+    </div>
+  </header>
+
+  <h2><span class="n">01</span>Does it match the paper?</h2>
+  <p>Section 4 of the paper: 100 repetitions, each holding out a random 10% of rows, growing 100-tree forests with
+    one and with four candidate features per split, and keeping the test error of whichever has the lower OOB error.
+    Each dot below is one repetition.</p>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <figure>
+    <svg id="strip" viewBox="0 0 720 200" width="100%" role="img" aria-label="Per-repetition test error"></svg>
+    <div class="readout" id="readout"></div>
+    <figcaption><b>Figure 1.</b> Test error per repetition (dots, jittered vertically), the mean with a 95% interval
+      (bar), and the value in Breiman's Table 2 (diamond). With 69 test rows per repetition, error moves in steps of
+      1.45 points, which is why the dots form columns.</figcaption>
+  </figure>
+  <table id="t2">
+    <thead><tr><th>Setting</th><th class="num">Ours, mean %</th><th class="num">SE</th><th class="num">Paper %</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <p style="font-size:15px;color:var(--muted)">Adaboost's 3.2% is quoted from the paper, not reimplemented. 16 rows with
+    a missing value were dropped (683 of 699), a documented deviation since the paper does not say how it handled
+    them.</p>
+
+  <h2><span class="n">02</span>Does the split criterion matter?</h2>
+  <p>A follow-up run with the same splits and seeds, swapping Gini impurity for entropy. Bars count repetitions by the
+    paired difference in test error.</p>
+  <figure>
+    <svg id="diff" viewBox="0 0 720 190" width="100%" role="img" aria-label="Paired differences, entropy minus Gini"></svg>
+    <div class="readout" id="diffread"></div>
+    <figcaption><b>Figure 2.</b> Entropy minus Gini test error for the selected forest, in percentage points, across
+      100 paired repetitions. Most repetitions tie exactly; the rest split roughly evenly.</figcaption>
+  </figure>
+
+  <h2><span class="n">03</span>Proximity-based outliers, and where they go wrong</h2>
+  <p>The extension, taken from Breiman and Cutler's later documentation rather than the 2001 paper, scores how
+    rarely each row shares a leaf with others of its class. The proximity matrix is structurally right: within-class
+    proximity is 0.681 against 0.008 across classes.</p>
+  <div class="pair">
+    <figure><img src="figures/proximity_heatmap.png" alt="Proximity heatmap, rows sorted by class" loading="lazy">
+      <figcaption><b>Figure 3.</b> Proximity matrix, rows sorted by class.</figcaption></figure>
+    <figure><img src="figures/proximity_mds.png" alt="Two-dimensional MDS embedding of one minus proximity" loading="lazy">
+      <figcaption><b>Figure 4.</b> MDS of 1 − proximity; flagged rows marked.</figcaption></figure>
+  </div>
+  <p>The outlier score does not hold up as cleanly. The benign class is so tight that its median absolute deviation is
+    78 times smaller than the malignant one, so a threshold of 3 flags 28% of all rows. One suspected cause is that
+    proximities counted in-bag rows, which fully grown trees memorise. The ablation below recomputes them with
+    out-of-bag pairs only, the definition in Hastie, Tibshirani &amp; Friedman (§15.3.3).</p>
+  <table>
+    <thead><tr><th>Same forest, seed 42</th><th class="num">In-bag</th><th class="num">OOB only</th></tr></thead>
+    <tbody>
+      <tr><td>Raw MAD ratio, malignant / benign</td><td class="num">78.3×</td><td class="num">38.9×</td></tr>
+      <tr><td>Largest normalised score</td><td class="num">8209</td><td class="num">3484</td></tr>
+      <tr><td>Rows flagged at score &gt; 3</td><td class="num">28.0%</td><td class="num">25.1%</td></tr>
+      <tr><td>Trees per pair used, mean</td><td class="num">100</td><td class="num">13.4</td></tr>
+    </tbody>
+  </table>
+  <div class="note">The hypothesis is only half right. In-bag counting explains about half of the MAD gap, but the flag
+    rate barely moves, so the per-class normalisation is still the main problem. The report recommends a per-class
+    top-5% cutoff instead of a fixed threshold.</div>
+
+  <h2><span class="n">04</span>What was checked</h2>
+  <table>
+    <tbody>
+      <tr><td>Bootstrap coverage, 1000 draws</td><td class="num">0.6321</td><td class="aside">theory 1 − 1/e = 0.6321</td></tr>
+      <tr><td>Distinct root-split features, m = 3 vs m = 9</td><td class="num">6 vs 3</td><td class="aside">subsetting diversifies trees</td></tr>
+      <tr><td>OOB error vs held-out error, single split</td><td class="num">2.93% / 3.65%</td><td class="aside">within one test-set step</td></tr>
+      <tr><td>Forest vs single full tree, test accuracy</td><td class="num">96.4% / 92.0%</td><td class="aside">137 test rows</td></tr>
+    </tbody>
+  </table>
+
+  <footer>
+    Breiman, L. (2001). Random Forests. <i>Machine Learning</i> 45(1), 5–32. Data: Wolberg (1990), UCI ML Repository
+    id 15. This is a reproduction and teaching project, not a new method. Code under the MIT licence.
+  </footer>
+</main>
+<script>
+(() => {
+  const PAPER = { "Selection": 2.9, "Single input (F=1)": 2.7, "One tree": 6.3 };
+  const ORDER = ["Selection", "Single input (F=1)", "One tree", "F=4", "F=3 (sqrt p)"];
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+
+  function parseCSV(text) {
+    const [head, ...rows] = text.trim().split(/\r?\n/);
+    const cols = head.split(",");
+    const data = Object.fromEntries(cols.map(c => [c, []]));
+    for (const r of rows) r.split(",").forEach((v, i) => data[cols[i]].push(parseFloat(v) * 100));
+    return data;
+  }
+  const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+  const se = a => { const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1) / a.length); };
+
+  // Draw in real pixels so labels stay legible on narrow screens.
+  const size = (svg, h) => {
+    const W = Math.round(Math.min(720, svg.parentElement.clientWidth || 720));
+    svg.setAttribute("viewBox", `0 0 ${W} ${h}`);
+    return W;
+  };
+
+  // Deterministic jitter so the plot does not reshuffle on every render.
+  const jitter = i => ((Math.sin(i * 12.9898) * 43758.5453) % 1 + 1) % 1;
+
+  function axis(svg, x, x0, x1, ticks, y, label) {
+    el("line", { x1: x(x0), x2: x(x1), y1: y, y2: y, stroke: css("--rule") }, svg);
+    for (const t of ticks) {
+      el("line", { x1: x(t), x2: x(t), y1: y, y2: y + 5, stroke: css("--rule") }, svg);
+      el("text", { x: x(t), y: y + 18, "text-anchor": "middle" }, svg).textContent = t;
+    }
+    el("text", { x: x(x1), y: y + 34, "text-anchor": "end" }, svg).textContent = label;
+  }
+
+  function drawStrip(data, key) {
+    const svg = document.getElementById("strip");
+    svg.replaceChildren();
+    const W = size(svg, 200);
+    const vals = data[key];
+    const xMax = 8;
+    const L = 20, R = W - 20, x = v => L + (v / xMax) * (R - L);
+    for (let t = 0; t <= xMax; t += 1) el("line", { x1: x(t), x2: x(t), y1: 12, y2: 140, stroke: css("--rule"), "stroke-dasharray": "2 4" }, svg);
+    vals.forEach((v, i) => el("circle", { cx: x(v), cy: 26 + jitter(i) * 70, r: 3.4, fill: css("--dot") }, svg));
+    const m = mean(vals), ci = 1.96 * se(vals);
+    el("line", { x1: x(m - ci), x2: x(m + ci), y1: 122, y2: 122, stroke: css("--accent"), "stroke-width": 2 }, svg);
+    el("circle", { cx: x(m), cy: 122, r: 5, fill: css("--accent") }, svg);
+    if (PAPER[key] !== undefined) {
+      const p = x(PAPER[key]);
+      el("path", { d: `M${p} 114 l7 8 l-7 8 l-7 -8 z`, fill: css("--paper") }, svg);
+    }
+    axis(svg, x, 0, xMax, [0, 1, 2, 3, 4, 5, 6, 7, 8], 150, "test error, %");
+    const paper = PAPER[key] !== undefined ? `<span>paper</span> ${PAPER[key].toFixed(1)}%` : "<span>no paper value for this setting</span>";
+    document.getElementById("readout").innerHTML =
+      `<span>mean</span> ${m.toFixed(2)}% <span>95% CI</span> [${(m - ci).toFixed(2)}, ${(m + ci).toFixed(2)}] &nbsp; ${paper}`;
+  }
+
+  function drawTable(data) {
+    const tb = document.querySelector("#t2 tbody");
+    tb.innerHTML = ORDER.map(k => `<tr><td>${k}</td><td class="num">${mean(data[k]).toFixed(2)}</td>` +
+      `<td class="num">${se(data[k]).toFixed(2)}</td><td class="num">${PAPER[k] !== undefined ? PAPER[k].toFixed(1) : "–"}</td></tr>`).join("");
+  }
+
+  function drawDiff(crit) {
+    const g = crit["gini Selection"], e = crit["entropy Selection"];
+    const d = g.map((v, i) => Math.round((e[i] - v) * 100) / 100);
+    const bins = new Map();
+    for (const v of d) bins.set(v, (bins.get(v) || 0) + 1);
+    const keys = [...bins.keys()].sort((a, b) => a - b);
+    const svg = document.getElementById("diff");
+    svg.replaceChildren();
+    const W = size(svg, 190);
+    const lo = Math.min(-3, keys[0]), hi = Math.max(3, keys[keys.length - 1]);
+    const L = 20, R = W - 20, x = v => L + ((v - lo) / (hi - lo)) * (R - L);
+    const maxC = Math.max(...bins.values()), h = c => (c / maxC) * 110;
+    for (const k of keys) {
+      const c = bins.get(k);
+      el("rect", { x: x(k) - 9, y: 130 - h(c), width: 18, height: h(c), fill: k === 0 ? css("--muted") : css("--accent") }, svg);
+      el("text", { x: x(k), y: 124 - h(c), "text-anchor": "middle" }, svg).textContent = c;
+    }
+    const ticks = [];
+    for (let t = Math.ceil(lo); t <= Math.floor(hi); t++) ticks.push(t);
+    axis(svg, x, lo, hi, ticks, 138, "entropy − Gini, points");
+    const better = d.filter(v => v > 0).length, worse = d.filter(v => v < 0).length, tie = d.length - better - worse;
+    document.getElementById("diffread").innerHTML =
+      `<span>Gini better</span> ${better} <span>tie</span> ${tie} <span>entropy better</span> ${worse} &nbsp; <span>mean diff</span> ${mean(d).toFixed(2)} pts`;
+  }
+
+  Promise.all([
+    fetch("results/paper_comparison_per_repeat.csv").then(r => r.text()),
+    fetch("results/criterion_comparison_per_repeat.csv").then(r => r.text()),
+  ]).then(([a, b]) => {
+    const data = parseCSV(a), crit = parseCSV(b);
+    const tabs = document.getElementById("tabs");
+    let current = ORDER[0];
+    function render() { drawStrip(data, current); drawDiff(crit); }
+    ORDER.forEach(k => {
+      const btn = document.createElement("button");
+      btn.textContent = k; btn.setAttribute("role", "tab");
+      btn.setAttribute("aria-selected", k === current);
+      btn.onclick = () => {
+        current = k;
+        tabs.querySelectorAll("button").forEach(b => b.setAttribute("aria-selected", b === btn));
+        drawStrip(data, current);
+      };
+      tabs.appendChild(btn);
+    });
+    drawTable(data);
+    render();
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
+    let t;
+    addEventListener("resize", () => { clearTimeout(t); t = setTimeout(render, 120); });
+  }).catch(() => {
+    document.getElementById("readout").textContent = "Could not load results/*.csv. Serve this page from the built site, not the docs folder alone.";
+  });
+})();
+</script>
+</body>
+</html>
